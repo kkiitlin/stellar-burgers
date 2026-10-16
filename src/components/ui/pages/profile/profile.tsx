@@ -9,6 +9,7 @@ export const ProfileUI = ({
   formValue,
   isFormChanged,
   updateUserError,
+  isUpdating,
   handleSubmit,
   handleCancel,
   handleInputChange,
@@ -68,8 +69,8 @@ export const ProfileUI = ({
             >
               Отменить
             </Button>
-            <Button type="primary" size="medium" htmlType="submit">
-              Сохранить
+            <Button type="primary" size="medium" htmlType="submit" disabled={isUpdating}>
+              {isUpdating ? 'Сохраняем...' : 'Сохранить'}
             </Button>
           </div>
         )}
