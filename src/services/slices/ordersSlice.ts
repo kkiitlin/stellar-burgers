@@ -1,46 +1,28 @@
-import { getFeedsApi, getOrderByNumberApi, getOrdersApi, orderBurgerApi } from '@api';
+import { getFeedsApi, getOrderByNumberApi, getOrdersApi } from '@api';
 import { createAsyncThunk, createSlice, type SerializedError } from '@reduxjs/toolkit';
 
-import type { TOrder } from '@utils-types';
+import type { TFeedState, TOrder } from '@utils-types';
 
-type TFeedSliceState = {
-  orders: TOrder[];
-  total: number;
-  totalToday: number;
-  isLoading: boolean;
+type TFeedSliceState = TFeedState & {
   error: SerializedError | null;
 };
 
-type TUserOrdersSliceState = {
-  orders: TOrder[];
-  isLoading: boolean;
-  error: SerializedError | null;
-};
+type TUserOrdersSliceState = Pick<TFeedSliceState, 'orders' | 'isLoading' | 'error'>;
 
-type TCurrentOrderSliceState = {
+type TCurrentOrderSliceState = Pick<TFeedSliceState, 'isLoading' | 'error'> & {
   order: TOrder | null;
-  isLoading: boolean;
-  error: SerializedError | null;
-};
-
-type TCreatedOrderSliceState = {
-  order: TOrder | null;
-  isCreating: boolean;
-  error: SerializedError | null;
 };
 
 type TOrdersState = {
   feed: TFeedSliceState;
   userOrders: TUserOrdersSliceState;
   currentOrder: TCurrentOrderSliceState;
-  createdOrder: TCreatedOrderSliceState;
 };
 
 const initialState: TOrdersState = {
   feed: { orders: [], total: 0, totalToday: 0, isLoading: true, error: null },
   userOrders: { orders: [], isLoading: true, error: null },
   currentOrder: { order: null, isLoading: true, error: null },
-  createdOrder: { order: null, isCreating: false, error: null },
 };
 
 export const fetchFeed = createAsyncThunk('orders/fetchFeed', async () => {
@@ -61,23 +43,10 @@ export const fetchOrderByNumber = createAsyncThunk(
   }
 );
 
-export const createOrder = createAsyncThunk(
-  'orders/createOrder',
-  async (ingredientIds: string[]) => {
-    const data = await orderBurgerApi(ingredientIds);
-    return data.order;
-  }
-);
-
 const ordersSlice = createSlice({
   name: 'orders',
   initialState,
-  reducers: {
-    resetCreatedOrder: (state) => {
-      state.createdOrder.order = null;
-      state.createdOrder.error = null;
-    },
-  },
+  reducers: {},
   extraReducers: (builder) => {
     builder
       .addCase(fetchFeed.pending, (state) => {
@@ -117,23 +86,9 @@ const ordersSlice = createSlice({
       .addCase(fetchOrderByNumber.rejected, (state, action) => {
         state.currentOrder.isLoading = false;
         state.currentOrder.error = action.error;
-      })
-      .addCase(createOrder.pending, (state) => {
-        state.createdOrder.isCreating = true;
-        state.createdOrder.error = null;
-      })
-      .addCase(createOrder.fulfilled, (state, action) => {
-        state.createdOrder.isCreating = false;
-        state.createdOrder.order = action.payload;
-      })
-      .addCase(createOrder.rejected, (state, action) => {
-        state.createdOrder.isCreating = false;
-        state.createdOrder.error = action.error;
       });
   },
 });
-
-export const { resetCreatedOrder } = ordersSlice.actions;
 
 export const selectFeed = (state: { orders: TOrdersState }): TFeedSliceState =>
   state.orders.feed;
@@ -154,12 +109,5 @@ export const selectCurrentOrderIsLoading = (state: { orders: TOrdersState }): bo
 export const selectCurrentOrderError = (state: {
   orders: TOrdersState;
 }): SerializedError | null => state.orders.currentOrder.error;
-export const selectCreatedOrder = (state: { orders: TOrdersState }): TOrder | null =>
-  state.orders.createdOrder.order;
-export const selectIsOrderCreating = (state: { orders: TOrdersState }): boolean =>
-  state.orders.createdOrder.isCreating;
-export const selectCreateOrderError = (state: {
-  orders: TOrdersState;
-}): SerializedError | null => state.orders.createdOrder.error;
 
 export default ordersSlice.reducer;

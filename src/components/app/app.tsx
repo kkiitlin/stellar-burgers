@@ -13,7 +13,7 @@ import {
 } from '@pages';
 import { Preloader } from '@ui';
 import { useEffect } from 'react';
-import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { Routes, Route, useLocation, useMatch, useNavigate } from 'react-router-dom';
 
 import {
   fetchIngredients,
@@ -98,6 +98,11 @@ const RouteComponent = (): React.JSX.Element => {
   const state = location.state as TBackgroundLocationState | null;
   const backgroundLocation = state?.background;
 
+  const feedOrderMatch = useMatch('/feed/:number');
+  const profileOrderMatch = useMatch('/profile/orders/:number');
+  const orderNumber = (feedOrderMatch ?? profileOrderMatch)?.params.number;
+  const orderTitle = orderNumber ? `#${orderNumber}` : '';
+
   const handleModalClose = (): void => {
     void navigate(-1);
   };
@@ -167,7 +172,7 @@ const RouteComponent = (): React.JSX.Element => {
           element={
             <div className={styles.detailPageWrap}>
               <h1 className={`${styles.detailHeader} text text_type_main-large mb-5`}>
-                Детали заказа
+                {orderTitle}
               </h1>
               <OrderInfo />
             </div>
@@ -190,7 +195,7 @@ const RouteComponent = (): React.JSX.Element => {
             <ProtectedRoute>
               <div className={styles.detailPageWrap}>
                 <h1 className={`${styles.detailHeader} text text_type_main-large mb-5`}>
-                  Детали заказа
+                  {orderTitle}
                 </h1>
                 <OrderInfo />
               </div>
@@ -208,7 +213,7 @@ const RouteComponent = (): React.JSX.Element => {
           <Route
             path="/feed/:number"
             element={
-              <Modal title="Детали заказа" onClose={handleModalClose}>
+              <Modal title={orderTitle} onClose={handleModalClose}>
                 <OrderInfo />
               </Modal>
             }
@@ -225,7 +230,7 @@ const RouteComponent = (): React.JSX.Element => {
             path="/profile/orders/:number"
             element={
               <ProtectedRoute>
-                <Modal title="Детали заказа" onClose={handleModalClose}>
+                <Modal title={orderTitle} onClose={handleModalClose}>
                   <OrderInfo />
                 </Modal>
               </ProtectedRoute>

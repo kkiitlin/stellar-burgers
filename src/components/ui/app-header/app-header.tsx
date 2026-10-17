@@ -42,7 +42,7 @@ export const AppHeaderUI = ({ userName }: TAppHeaderUIProps): React.JSX.Element 
         <Logo className="" />
       </div>
       <NavLink
-        to={userName ? '/profile' : '/login'}
+        to={'/profile'}
         className={({ isActive }) =>
           `text text_type_main-default ${styles.link_position_last} ${styles.link}${
             isActive ? ` ${styles.link_active}` : ''

@@ -14,7 +14,7 @@ type TProtectedRouteProps = {
   onlyUnAuth?: boolean; // Флаг для роутов, доступных ТОЛЬКО неавторизованным (логин, регистрация)
 };
 
-type TProtectedRouteState = {
+export type TProtectedRouteState = {
   from?: Partial<Location>;
 };
 

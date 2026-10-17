@@ -5,7 +5,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { loginUser } from '../../services/slices/userSlice';
 import { useDispatch } from '../../services/store';
 
-import type { Location } from 'react-router-dom';
+import type { TProtectedRouteState } from '@components/protected-route/protected-route';
 
 export const Login = (): React.JSX.Element => {
   const dispatch = useDispatch();
@@ -20,7 +20,7 @@ export const Login = (): React.JSX.Element => {
     e.preventDefault();
 
     setError(null);
-    const state = location.state as { from?: Partial<Location> } | null;
+    const state = location.state as TProtectedRouteState | null;
     const from = state?.from;
 
     void dispatch(loginUser({ email, password }))

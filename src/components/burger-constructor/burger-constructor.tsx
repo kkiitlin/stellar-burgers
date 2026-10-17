@@ -2,17 +2,14 @@ import { BurgerConstructorUI } from '@ui';
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom'; // 1. Импортируем хук навигации
 
-import {
-  clearConstructor,
-  selectConstructor,
-} from '../../services/slices/burgerConstructorSlice';
+import { selectConstructor } from '../../services/slices/burgerConstructorSlice';
 import {
   createOrder,
   resetCreatedOrder,
   selectCreateOrderError,
   selectCreatedOrder,
   selectIsOrderCreating,
-} from '../../services/slices/ordersSlice';
+} from '../../services/slices/createOrderSlice';
 import {
   selectIsAuthChecked,
   selectIsAuthenticated,
@@ -52,9 +49,6 @@ export const BurgerConstructor = (): React.JSX.Element => {
   };
 
   const closeOrderModal = (): void => {
-    if (orderModalData) {
-      void dispatch(clearConstructor());
-    }
     void dispatch(resetCreatedOrder());
   };
 
