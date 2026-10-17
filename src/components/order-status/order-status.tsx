@@ -6,12 +6,14 @@ const STATUS_TEXT: Record<string, string | undefined> = {
   pending: 'Готовится',
   done: 'Выполнен',
   created: 'Создан',
+  canceled: 'Отменён',
 };
 
 const STATUS_COLOR: Record<string, string | undefined> = {
-  pending: '#E52B1A',
+  pending: '#F2F2F3',
   done: '#00CCCC',
   created: '#F2F2F3',
+  canceled: '#E52B1A',
 };
 
 const UNKNOWN_STATUS_TEXT = 'Неизвестен';

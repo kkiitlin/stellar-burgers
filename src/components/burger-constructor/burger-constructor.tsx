@@ -1,24 +1,55 @@
 import { BurgerConstructorUI } from '@ui';
 import { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom'; // 1. Импортируем хук навигации
 
-import type { TConstructorIngredient, TConstructorState, TOrder } from '@utils-types';
+import { selectConstructor } from '../../services/slices/burgerConstructorSlice';
+import {
+  createOrder,
+  resetCreatedOrder,
+  selectCreateOrderError,
+  selectCreatedOrder,
+  selectIsOrderCreating,
+} from '../../services/slices/createOrderSlice';
+import {
+  selectIsAuthChecked,
+  selectIsAuthenticated,
+} from '../../services/slices/userSlice';
+import { useDispatch, useSelector } from '../../services/store';
 
-export const BurgerConstructor = (): React.JSX.Element | null => {
-  /** TODO: Взять переменные constructorItems, orderRequest и orderModalData из стора */
-  const constructorItems: TConstructorState = {
-    bun: null,
-    ingredients: [],
-  };
-  const orderRequest = false;
-  const orderModalData: TOrder | null = null;
+import type { TConstructorIngredient } from '@utils-types';
+
+export const BurgerConstructor = (): React.JSX.Element => {
+  const dispatch = useDispatch();
+  const navigate = useNavigate(); // Инициализируем функцию для переходов
+  const isAuthenticated = useSelector(selectIsAuthenticated); // Узнаем, залогинен ли юзер
+  const isAuthChecked = useSelector(selectIsAuthChecked);
+  const constructorItems = useSelector(selectConstructor);
+  const orderRequest = useSelector(selectIsOrderCreating);
+  const orderModalData = useSelector(selectCreatedOrder);
+  const orderError = useSelector(selectCreateOrderError);
 
   const onOrderClick = (): void => {
+    if (!isAuthChecked) return;
+
+    // 3. Главная проверка: если пользователь НЕ авторизован, отправляем на /login
+    if (!isAuthenticated) {
+      void navigate('/login');
+      return; // Прерываем выполнение функции, чтобы заказ не начал оформляться
+    }
+
+    // Если авторизован, логика идет дальше
     if (!constructorItems.bun || orderRequest) return;
-    // TODO: Оформить заказ
+
+    const ingredientIds = [
+      constructorItems.bun._id,
+      ...constructorItems.ingredients.map((item: TConstructorIngredient) => item._id),
+      constructorItems.bun._id,
+    ];
+    void dispatch(createOrder(ingredientIds));
   };
 
   const closeOrderModal = (): void => {
-    // TODO: Закрыть модальное окно и сбросить заказ
+    void dispatch(resetCreatedOrder());
   };
 
   const price = useMemo(
@@ -37,6 +68,7 @@ export const BurgerConstructor = (): React.JSX.Element | null => {
       orderRequest={orderRequest}
       constructorItems={constructorItems}
       orderModalData={orderModalData}
+      orderErrorText={orderError?.message}
       onOrderClick={onOrderClick}
       closeOrderModal={closeOrderModal}
     />

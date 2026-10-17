@@ -16,6 +16,7 @@ export const BurgerConstructorUI = ({
   orderRequest,
   price,
   orderModalData,
+  orderErrorText,
   onOrderClick,
   closeOrderModal,
 }: BurgerConstructorUIProps): React.JSX.Element => (
@@ -77,6 +78,9 @@ export const BurgerConstructorUI = ({
         <p className={`text ${styles.text} mr-2`}>{price}</p>
         <CurrencyIcon type="primary" />
       </div>
+      {orderErrorText && (
+        <p className="text text_type_main-default mr-5">{orderErrorText}</p>
+      )}
       <Button htmlType="button" type="primary" size="large" onClick={onOrderClick}>
         Оформить заказ
       </Button>

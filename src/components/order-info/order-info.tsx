@@ -1,31 +1,42 @@
 import { Preloader, OrderInfoUI } from '@ui';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
+import { useParams } from 'react-router-dom';
+
+import { NotFound404 } from '@pages/not-fount-404/not-fount-404';
+
+import { selectIngredients } from '../../services/slices/ingredientsSlice';
+import {
+  fetchOrderByNumber,
+  selectCurrentOrder,
+  selectCurrentOrderError,
+  selectCurrentOrderIsLoading,
+} from '../../services/slices/ordersSlice';
+import { useDispatch, useSelector } from '../../services/store';
 
 import type { TIngredient } from '@utils-types';
 
 export const OrderInfo = (): React.JSX.Element => {
-  /** TODO: взять переменные orderData и ingredients из стора */
-  const orderData = {
-    createdAt: '',
-    ingredients: [],
-    _id: '',
-    status: '',
-    name: '',
-    updatedAt: 'string',
-    number: 0,
-  };
+  const { number } = useParams<{ number: string }>();
+  const dispatch = useDispatch();
 
-  const ingredients: TIngredient[] = [];
+  const order = useSelector(selectCurrentOrder);
+  const isLoading = useSelector(selectCurrentOrderIsLoading);
+  const error = useSelector(selectCurrentOrderError);
+  const ingredients = useSelector(selectIngredients);
+
+  useEffect(() => {
+    void dispatch(fetchOrderByNumber(Number(number)));
+  }, [dispatch, number]);
 
   /* Готовим данные для отображения */
   const orderInfo = useMemo(() => {
-    if (!orderData || !ingredients.length) return null;
+    if (!order || !ingredients.length) return null;
 
-    const date = new Date(orderData.createdAt);
+    const date = new Date(order.createdAt);
 
     type TIngredientsWithCount = Record<string, TIngredient & { count: number }>;
 
-    const ingredientsInfo = orderData.ingredients.reduce(
+    const ingredientsInfo = order.ingredients.reduce(
       (acc: TIngredientsWithCount, item) => {
         if (!acc[item]) {
           const ingredient = ingredients.find((ing) => ing._id === item);
@@ -50,15 +61,27 @@ export const OrderInfo = (): React.JSX.Element => {
     );
 
     return {
-      ...orderData,
+      ...order,
       ingredientsInfo,
       date,
       total,
     };
-  }, [orderData, ingredients]);
+  }, [order, ingredients]);
+
+  if (isLoading) {
+    return <Preloader />;
+  }
+
+  if (error) {
+    return (
+      <p className="text text_type_main-medium">
+        Не удалось загрузить заказ{error.message ? `: ${error.message}` : '.'}
+      </p>
+    );
+  }
 
   if (!orderInfo) {
-    return <Preloader />;
+    return <NotFound404 />;
   }
 
   return <OrderInfoUI orderInfo={orderInfo} />;
