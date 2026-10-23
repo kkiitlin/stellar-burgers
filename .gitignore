@@ -33,3 +33,11 @@ test-results
 .env
 .env.local
 .env.*.local
+
+coverage/
+
+# Playwright
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
