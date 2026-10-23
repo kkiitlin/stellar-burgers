@@ -5,6 +5,16 @@ const config: Config = {
   testEnvironment: 'node',
   roots: ['<rootDir>/src'],
   testMatch: ['**/*.test.ts'],
+  passWithNoTests: true,
+  collectCoverageFrom: [
+    'src/**/*.{ts,tsx}',
+    '!src/**/*.d.ts',
+    '!src/**/*.stories.tsx',
+    '!src/stories/**',
+    '!src/index.tsx',
+  ],
+  coverageDirectory: 'coverage',
+  coverageReporters: ['text', 'lcov', 'html'],
   moduleNameMapper: {
     '^@api$': '<rootDir>/src/utils/burger-api',
     '^@api/(.*)$': '<rootDir>/src/utils/burger-api/$1',
