@@ -1,33 +1,52 @@
-import { test, expect } from '@playwright/test';
+import path from 'node:path';
+
+import { test, expect, type Locator, type Page } from '@playwright/test';
+
+const HARS_DIR = path.resolve(import.meta.dirname, 'hars');
+const harPath = (name: string): string => path.join(HARS_DIR, name);
 
 const INGREDIENTS_API = '**/api/ingredients';
 const USER_API = '**/api/auth/user';
-const INGREDIENTS_FIXTURE = 'tests/fixtures/ingredients.mock.json';
+const ORDER_API = '**/api/orders';
+
 const FIRST_INGREDIENT_NAME = 'Краторная булка';
 const FILLING_NAME = 'Биф из говядины';
+const MOCK_ORDER_NUMBER = 42;
 
-async function mockIngredientRoutes(page: Parameters<typeof test>[0]['page']): Promise<void> {
-  await page.route(INGREDIENTS_API, async (route) => {
-    await route.fulfill({ path: INGREDIENTS_FIXTURE });
-  });
-
-  await page.route(USER_API, async (route) => {
-    await route.fulfill({
-      status: 401,
-      body: JSON.stringify({ success: false }),
-      contentType: 'application/json',
-    });
-  });
+/**
+ * Ответы сервера подставляются из HAR-файлов в `tests/hars`.
+ * `url` ограничивает перехват конкретным эндпоинтом, а `notFound: 'abort'`
+ * не даёт запросу уйти в реальную сеть, если в HAR нет подходящей записи
+ * (например, если тело POST-запроса отличается от записанного).
+ */
+async function routeFromHar(page: Page, har: string, url: string): Promise<void> {
+  await page.routeFromHAR(harPath(har), { url, notFound: 'abort' });
 }
 
+async function mockIngredientRoutes(page: Page): Promise<void> {
+  await routeFromHar(page, 'ingredients.har', INGREDIENTS_API);
+  await routeFromHar(page, 'user-unauthorized.har', USER_API);
+}
+
+async function mockAuthorizedOrderRoutes(page: Page): Promise<void> {
+  await routeFromHar(page, 'ingredients.har', INGREDIENTS_API);
+  await routeFromHar(page, 'user-authorized.har', USER_API);
+  await routeFromHar(page, 'order.har', ORDER_API);
+}
+
+/* На странице две навигации: меню в шапке и табы ингредиентов,
+   поэтому ищем навигацию именно внутри шапки. */
+const headerNavigation = (page: Page): Locator =>
+  page.getByRole('banner').getByRole('navigation');
+
 test.describe('Constructor page (mocked ingredients)', () => {
-  test('renders mocked ingredients from JSON fixture', async ({ page }) => {
+  test('renders mocked ingredients from HAR', async ({ page }) => {
     await mockIngredientRoutes(page);
 
     await page.goto('/');
-    await expect(page.getByRole('navigation')).toBeVisible();
+    await expect(headerNavigation(page)).toBeVisible();
     await expect(page.getByText(FIRST_INGREDIENT_NAME)).toBeVisible();
-    await expect(page.getByText('Биф из говядины')).toBeVisible();
+    await expect(page.getByText(FILLING_NAME)).toBeVisible();
     await expect(page.getByText('Сырный соус')).toBeVisible();
     await expect(page.locator('img[alt="картинка ингредиента."]')).toHaveCount(3);
   });
@@ -38,7 +57,7 @@ test.describe('Ingredient details modal', () => {
     await mockIngredientRoutes(page);
 
     await page.goto('/');
-    await expect(page.getByRole('navigation')).toBeVisible();
+    await expect(headerNavigation(page)).toBeVisible();
     await expect(page.getByText(FIRST_INGREDIENT_NAME)).toBeVisible();
 
     await page.getByRole('link', { name: FIRST_INGREDIENT_NAME }).first().click();
@@ -58,7 +77,9 @@ test.describe('Ingredient details modal', () => {
 
     await page.getByRole('button', { name: 'Закрыть' }).click();
 
-    await expect(page.getByRole('heading', { name: 'Детали ингредиента' })).not.toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Детали ингредиента' })
+    ).not.toBeVisible();
   });
 
   test('closes when clicking the outer overlay', async ({ page }) => {
@@ -72,7 +93,9 @@ test.describe('Ingredient details modal', () => {
 
     await page.mouse.click(100, 100);
 
-    await expect(page.getByRole('heading', { name: 'Детали ингредиента' })).not.toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Детали ингредиента' })
+    ).not.toBeVisible();
   });
 });
 
@@ -81,7 +104,7 @@ test.describe('Constructor (adding ingredients)', () => {
     await mockIngredientRoutes(page);
 
     await page.goto('/');
-    await expect(page.getByRole('navigation')).toBeVisible();
+    await expect(headerNavigation(page)).toBeVisible();
     await expect(page.getByText(FIRST_INGREDIENT_NAME)).toBeVisible();
 
     await page
@@ -100,43 +123,7 @@ test.describe('Constructor (adding ingredients)', () => {
 });
 
 test.describe('Order placement (full cycle)', () => {
-  const ORDER_API = '**/api/orders';
-  const MOCK_ORDER_NUMBER = 42;
-
-  async function setupAuthAndOrderRoutes(page: Parameters<typeof test>[0]['page']): Promise<void> {
-    await page.route(USER_API, async (route) => {
-      await route.fulfill({
-        status: 200,
-        body: JSON.stringify({
-          success: true,
-          user: { email: 'user@test.com', name: 'Test User' },
-        }),
-        contentType: 'application/json',
-      });
-    });
-
-    await page.route(ORDER_API, async (route) => {
-      await route.fulfill({
-        status: 200,
-        body: JSON.stringify({
-          success: true,
-          order: {
-            _id: 'mock-order-id',
-            status: 'done',
-            name: 'Ультимативный бургер',
-            createdAt: '2024-01-01T00:00:00.000Z',
-            updatedAt: '2024-01-01T00:00:00.000Z',
-            number: MOCK_ORDER_NUMBER,
-            ingredients: [],
-          },
-          name: 'Ультимативный бургер',
-        }),
-        contentType: 'application/json',
-      });
-    });
-  }
-
-  async function setAuthTokens(page: Parameters<typeof test>[0]['page']): Promise<void> {
+  async function setAuthTokens(page: Page): Promise<void> {
     await page.evaluate(() => {
       localStorage.setItem('refreshToken', 'mock-refresh-token');
       document.cookie = 'accessToken=mock-access-token; path=/';
@@ -147,8 +134,7 @@ test.describe('Order placement (full cycle)', () => {
   test('оформление заказа: добавление ингредиентов → заказ → очистка конструктора → закрытие модалки', async ({
     page,
   }) => {
-    await mockIngredientRoutes(page);
-    await setupAuthAndOrderRoutes(page);
+    await mockAuthorizedOrderRoutes(page);
 
     await page.goto('/');
 
@@ -170,12 +156,16 @@ test.describe('Order placement (full cycle)', () => {
 
     await page.getByRole('button', { name: 'Оформить заказ' }).click();
 
-    await expect(page.getByRole('heading', { name: String(MOCK_ORDER_NUMBER) })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: String(MOCK_ORDER_NUMBER) })
+    ).toBeVisible();
 
     await expect(page.getByText('Выберите булки').first()).toBeVisible();
     await expect(page.getByText('Выберите начинку')).toBeVisible();
 
     await page.getByRole('button', { name: 'Закрыть' }).click();
-    await expect(page.getByRole('heading', { name: String(MOCK_ORDER_NUMBER) })).not.toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: String(MOCK_ORDER_NUMBER) })
+    ).not.toBeVisible();
   });
 });
