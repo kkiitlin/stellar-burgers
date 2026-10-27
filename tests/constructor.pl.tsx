@@ -9,16 +9,15 @@ const INGREDIENTS_API = '**/api/ingredients';
 const USER_API = '**/api/auth/user';
 const ORDER_API = '**/api/orders';
 
-const FIRST_INGREDIENT_NAME = 'Краторная булка';
+const BUN = {
+  name: 'Краторная булка',
+  calories: '420',
+  proteins: '80',
+};
 const FILLING_NAME = 'Биф из говядины';
+const SAUCE_NAME = 'Сырный соус';
 const MOCK_ORDER_NUMBER = 42;
 
-/**
- * Ответы сервера подставляются из HAR-файлов в `tests/hars`.
- * `url` ограничивает перехват конкретным эндпоинтом, а `notFound: 'abort'`
- * не даёт запросу уйти в реальную сеть, если в HAR нет подходящей записи
- * (например, если тело POST-запроса отличается от записанного).
- */
 async function routeFromHar(page: Page, har: string, url: string): Promise<void> {
   await page.routeFromHAR(harPath(har), { url, notFound: 'abort' });
 }
@@ -34,91 +33,122 @@ async function mockAuthorizedOrderRoutes(page: Page): Promise<void> {
   await routeFromHar(page, 'order.har', ORDER_API);
 }
 
-/* На странице две навигации: меню в шапке и табы ингредиентов,
-   поэтому ищем навигацию именно внутри шапки. */
 const headerNavigation = (page: Page): Locator =>
   page.getByRole('banner').getByRole('navigation');
+
+const modals = (page: Page): Locator => page.locator('#modals');
+
+const burgerConstructor = (page: Page): Locator =>
+  page
+    .locator('section')
+    .filter({ has: page.getByRole('button', { name: 'Оформить заказ' }) });
+
+const ingredientCard = (page: Page, name: string): Locator =>
+  page.locator('li', { has: page.getByRole('link', { name }) });
+
+async function openPageWithIngredients(page: Page): Promise<void> {
+  await page.goto('/');
+  await expect(headerNavigation(page)).toBeVisible();
+  await expect(ingredientCard(page, BUN.name)).toBeVisible();
+}
+
+async function openBunDetails(page: Page): Promise<Locator> {
+  await expect(modals(page)).toBeEmpty();
+
+  await page.getByRole('link', { name: BUN.name }).click();
+
+  const modal = modals(page);
+  await expect(modal.getByRole('heading', { name: 'Детали ингредиента' })).toBeVisible();
+  await expect(
+    modal.getByRole('heading', { name: BUN.name, exact: true })
+  ).toBeVisible();
+  await expect(
+    modal.getByRole('listitem').filter({ hasText: 'Калории, ккал' })
+  ).toContainText(BUN.calories);
+  await expect(
+    modal.getByRole('listitem').filter({ hasText: 'Белки, г' })
+  ).toContainText(BUN.proteins);
+
+  return modal;
+}
+
+async function expectConstructorIsEmpty(page: Page): Promise<void> {
+  const constructorBlock = burgerConstructor(page);
+
+  await expect(constructorBlock.getByText('Выберите булки')).toHaveCount(2);
+  await expect(constructorBlock.getByText('Выберите начинку')).toBeVisible();
+  await expect(constructorBlock.getByText(BUN.name)).toHaveCount(0);
+  await expect(constructorBlock.getByText(FILLING_NAME)).toHaveCount(0);
+}
+
+async function addBunAndFilling(page: Page): Promise<void> {
+  const constructorBlock = burgerConstructor(page);
+
+  await ingredientCard(page, BUN.name).getByRole('button', { name: 'Добавить' }).click();
+  await expect(constructorBlock.getByText(`${BUN.name} (верх)`)).toBeVisible();
+  await expect(constructorBlock.getByText(`${BUN.name} (низ)`)).toBeVisible();
+  await expect(constructorBlock.getByText('Выберите булки')).toHaveCount(0);
+
+  await ingredientCard(page, FILLING_NAME)
+    .getByRole('button', { name: 'Добавить' })
+    .click();
+  await expect(constructorBlock.getByText(FILLING_NAME, { exact: true })).toBeVisible();
+  await expect(constructorBlock.getByText('Выберите начинку')).toHaveCount(0);
+}
 
 test.describe('Constructor page (mocked ingredients)', () => {
   test('renders mocked ingredients from HAR', async ({ page }) => {
     await mockIngredientRoutes(page);
 
-    await page.goto('/');
-    await expect(headerNavigation(page)).toBeVisible();
-    await expect(page.getByText(FIRST_INGREDIENT_NAME)).toBeVisible();
-    await expect(page.getByText(FILLING_NAME)).toBeVisible();
-    await expect(page.getByText('Сырный соус')).toBeVisible();
+    await openPageWithIngredients(page);
+    await expect(ingredientCard(page, FILLING_NAME)).toBeVisible();
+    await expect(ingredientCard(page, SAUCE_NAME)).toBeVisible();
     await expect(page.locator('img[alt="картинка ингредиента."]')).toHaveCount(3);
   });
 });
 
 test.describe('Ingredient details modal', () => {
-  test('opens when clicking on an ingredient card', async ({ page }) => {
+  test('opens the details of the clicked ingredient', async ({ page }) => {
     await mockIngredientRoutes(page);
+    await openPageWithIngredients(page);
 
-    await page.goto('/');
-    await expect(headerNavigation(page)).toBeVisible();
-    await expect(page.getByText(FIRST_INGREDIENT_NAME)).toBeVisible();
+    const modal = await openBunDetails(page);
 
-    await page.getByRole('link', { name: FIRST_INGREDIENT_NAME }).first().click();
-
-    await expect(page.getByRole('heading', { name: 'Детали ингредиента' })).toBeVisible();
-    await expect(page.locator('img[alt="изображение ингредиента."]')).toBeVisible();
+    await expect(modal.locator('img[alt="изображение ингредиента."]')).toBeVisible();
+    await expect(modal.getByRole('heading', { name: SAUCE_NAME })).toHaveCount(0);
   });
 
   test('closes when clicking the close button (крестик)', async ({ page }) => {
     await mockIngredientRoutes(page);
+    await openPageWithIngredients(page);
 
-    await page.goto('/');
-    await expect(page.getByText(FIRST_INGREDIENT_NAME)).toBeVisible();
+    const modal = await openBunDetails(page);
 
-    await page.getByRole('link', { name: FIRST_INGREDIENT_NAME }).first().click();
-    await expect(page.getByRole('heading', { name: 'Детали ингредиента' })).toBeVisible();
+    await modal.getByRole('button', { name: 'Закрыть' }).click();
 
-    await page.getByRole('button', { name: 'Закрыть' }).click();
-
-    await expect(
-      page.getByRole('heading', { name: 'Детали ингредиента' })
-    ).not.toBeVisible();
+    await expect(modals(page)).toBeEmpty();
   });
 
   test('closes when clicking the outer overlay', async ({ page }) => {
     await mockIngredientRoutes(page);
+    await openPageWithIngredients(page);
 
-    await page.goto('/');
-    await expect(page.getByText(FIRST_INGREDIENT_NAME)).toBeVisible();
-
-    await page.getByRole('link', { name: FIRST_INGREDIENT_NAME }).first().click();
-    await expect(page.getByRole('heading', { name: 'Детали ингредиента' })).toBeVisible();
+    await openBunDetails(page);
 
     await page.mouse.click(100, 100);
 
-    await expect(
-      page.getByRole('heading', { name: 'Детали ингредиента' })
-    ).not.toBeVisible();
+    await expect(modals(page)).toBeEmpty();
   });
 });
 
 test.describe('Constructor (adding ingredients)', () => {
   test('adds one bun and one filling to the constructor zone', async ({ page }) => {
     await mockIngredientRoutes(page);
+    await openPageWithIngredients(page);
 
-    await page.goto('/');
-    await expect(headerNavigation(page)).toBeVisible();
-    await expect(page.getByText(FIRST_INGREDIENT_NAME)).toBeVisible();
+    await expectConstructorIsEmpty(page);
 
-    await page
-      .locator('li', { hasText: FIRST_INGREDIENT_NAME })
-      .getByRole('button', { name: 'Добавить' })
-      .click();
-    await expect(page.getByText('Краторная булка (верх)')).toBeVisible();
-    await expect(page.getByText('Краторная булка (низ)')).toBeVisible();
-
-    await page
-      .locator('li', { hasText: FILLING_NAME })
-      .getByRole('button', { name: 'Добавить' })
-      .click();
-    await expect(page.getByText(FILLING_NAME).last()).toBeVisible();
+    await addBunAndFilling(page);
   });
 });
 
@@ -137,35 +167,27 @@ test.describe('Order placement (full cycle)', () => {
     await mockAuthorizedOrderRoutes(page);
 
     await page.goto('/');
-
     await setAuthTokens(page);
-    await expect(page.getByText(FIRST_INGREDIENT_NAME)).toBeVisible();
+    await expect(ingredientCard(page, BUN.name)).toBeVisible();
 
-    await page
-      .locator('li', { hasText: FIRST_INGREDIENT_NAME })
-      .getByRole('button', { name: 'Добавить' })
+    await expectConstructorIsEmpty(page);
+    await addBunAndFilling(page);
+
+    await expect(modals(page)).toBeEmpty();
+
+    await burgerConstructor(page)
+      .getByRole('button', { name: 'Оформить заказ' })
       .click();
-    await expect(page.getByText('Краторная булка (верх)')).toBeVisible();
-    await expect(page.getByText('Краторная булка (низ)')).toBeVisible();
 
-    await page
-      .locator('li', { hasText: FILLING_NAME })
-      .getByRole('button', { name: 'Добавить' })
-      .click();
-    await expect(page.getByText(FILLING_NAME).last()).toBeVisible();
-
-    await page.getByRole('button', { name: 'Оформить заказ' }).click();
-
+    const modal = modals(page);
     await expect(
-      page.getByRole('heading', { name: String(MOCK_ORDER_NUMBER) })
+      modal.getByRole('heading', { name: String(MOCK_ORDER_NUMBER), exact: true })
     ).toBeVisible();
+    await expect(modal.getByText('идентификатор заказа')).toBeVisible();
 
-    await expect(page.getByText('Выберите булки').first()).toBeVisible();
-    await expect(page.getByText('Выберите начинку')).toBeVisible();
+    await expectConstructorIsEmpty(page);
 
-    await page.getByRole('button', { name: 'Закрыть' }).click();
-    await expect(
-      page.getByRole('heading', { name: String(MOCK_ORDER_NUMBER) })
-    ).not.toBeVisible();
+    await modal.getByRole('button', { name: 'Закрыть' }).click();
+    await expect(modals(page)).toBeEmpty();
   });
 });
